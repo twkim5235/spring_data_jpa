@@ -35,11 +35,11 @@
 **스프링 데이터 JPA가 구현클래스를 대신 생성해 준다.**
 
 ~~~
-								    |<interface> ItemRepository|
-                               ↑
-|Spring Data JPA| ↘︎(생성)			 ↑
-										↘︎					↑
-										 	|ItemRepository 구현 클래스|
+                        |<interface> ItemRepository|
+                                    ↑
+|Spring Data JPA| ↘︎(생성)            ↑
+                     ↘              ↑
+                       ->  |ItemRepository 구현 클래스|
 ~~~
 
 - 스프링 데이터 JPA가 애플리케이션 로딩 시점에 해당 Repository의 구현클래스를 만들어준다.
