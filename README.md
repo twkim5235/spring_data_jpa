@@ -19,7 +19,7 @@
     - Assertj: 테스트 코드를 좀더 편하게 작성을 도와주는 라이브러리
     - spring-test: 스프링 통합 테스트 지원
 
-### 공통 인터페이스 설정
+## 공통 인터페이스 설정
 
 **JavaConfig 설정 - 스프링 부트 사용시 생략 가능**
 
@@ -72,3 +72,67 @@
 
 
 JpaRepository는 대부분의 공통메서드를 제공한다.
+
+## 쿼리 메소드 기능
+
+- 메소드 이름으로 쿼리생성
+- NamedQuery
+- @Query - Repository 메소드 위에 쿼리정의
+- 파라미터 바인딩
+- 반환 타입
+- 페이징과 정렬
+- 벌크성 수정 쿼리
+- @EntityGraph
+
+
+
+스프링 데이터 JPA가 제공하는 기능
+
+
+
+#### **쿼리 메소드 3가지**
+
+- 메소드 이름으로 쿼리 생성
+- 메소드 이름으로 JPA NamedQuery 호출
+- @Query 어노테이션을 사용해서 Repository 인터페이스에 쿠러 직접 정의
+
+
+
+### 메소드 이름으로 쿼리 생성
+
+~~~java
+ex)
+List<Member> findByUsernameAndAgeGreaterThan(String username, int age);
+
+JPQL
+select
+        member0_.member_id as member_i1_0_,
+        member0_.age as age2_0_,
+        member0_.team_id as team_id4_0_,
+        member0_.username as username3_0_ 
+    from
+        member member0_ 
+    where
+        member0_.username=? 
+        and member0_.age>?
+~~~
+
+스프링 데이터  JPA Repository에 상단의 예시와같이 조건을 넣어서 추상메소드를 만들면 JPA가 알아서 해당 메소드를 구현해준다.
+
+**프로퍼티 명을 제대로 명시해줘야한다. 프로그램에서 잘못된 프로퍼티를 인식할수 없다고 하는 오류가 발생한다.**
+
+
+
+**스프링 데이터 JPA가 제공하는 쿼리 메소드 기능**
+
+- 조회: find...By, read...By, query...By, get..By
+  - 예) findHelloBy처럼 ...에 식별하기 위한 내용(설명)이 들어가도 된다.
+- COUNT: count..By 반환타입 long
+- EXISTS: exists...By 반환타입 boolean
+- 삭제: delete...By, remove...By 반환타입 long
+- DISTINCT: findDistinct, findMemberDistinctBy
+- LIMIT: findFist3, findFist, findTop, findTop3
+
+
+
+참고: 이 기능은 에티티의 필드명이 변경되면 인터페이스에 정의한 메서드 이름도 꼭 함께 변경해야 한다. 그렇지 않으면 애플리케이션을 시작하는 시점에 오류가 발생한다.  이렇게 애플리케이션 로딩시점에 오류를 인지할 수 있는 것이 스프링데이터 JPA의 매우 큰 장점이다.
