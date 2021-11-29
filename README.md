@@ -133,6 +133,106 @@ select
 - DISTINCT: findDistinct, findMemberDistinctBy
 - LIMIT: findFist3, findFist, findTop, findTop3
 
+**참고: 이 기능은 엔티티의 필드명이 변경되면 인터페이스에 정의한 메서드 이름도 꼭 함께 변경해야 한다. 그렇지 않으면 애플리케이션을 시작하는 시점에 오류가 발생한다.  이렇게 애플리케이션 로딩시점에 오류를 인지할 수 있는 것이 스프링데이터 JPA의 매우 큰 장점이다.**
+
+### JPA NamedQuery
+
+실무에서는 많이 안쓰이므로 예시만 남겨둔다.
+
+~~~java
+Entity
+@NamedQuery(
+		name = "Member.findByUsername",
+  	query = "select m from Member m where m.username = :username"
+)
 
 
-참고: 이 기능은 에티티의 필드명이 변경되면 인터페이스에 정의한 메서드 이름도 꼭 함께 변경해야 한다. 그렇지 않으면 애플리케이션을 시작하는 시점에 오류가 발생한다.  이렇게 애플리케이션 로딩시점에 오류를 인지할 수 있는 것이 스프링데이터 JPA의 매우 큰 장점이다.
+Repository
+  
+//@Query(name = "Member.findByUsername") 없어도 동작한다.
+//NamedQuery가 존재하면 NamedQuery를 먼저 찾아서 동작한다.
+List<Member> findByUsername(@Param("username") String username);
+~~~
+
+장점: namedQuery의 query에 JPQL을 잘못 적으면 문법오류를 알려줌.
+
+
+
+## @Query, Repository 메소드에 쿼리 정의하기
+
+메소드에 JPQL 쿼리를 작성한다.
+
+~~~java
+ Repository
+
+@Query("select m from Member m where m.username = :username and m.age = :age")
+List<Member> findUser(@Param("username") String username, @Param("age") int age);
+~~~
+
+- 실행할 메서드에 정적쿼리를 직접 작성하므로 이름없는 NamedQuery라 할 수 있다.
+- **JPA NamedQuery처럼 애플리케이션 실행 시점에 문법 오류를 발견할 수 있다.(매우 큰 장점!)**
+
+
+
+**참고: 실무에서는 메소드 이름으로 쿼리 생성 기능은 파라미터가 증가하면 메서드 이름이 매우 지저분해진다. 따라서 @Query기능을 자주 사용하게 된다.**
+
+
+
+## @Query, 값, DTO 조회하기
+
+**단순히 값 하나를 조회**
+
+~~~java
+@Query("select m.username from Member m")
+List<String> findUsernameList();
+~~~
+
+JPA값 타입(@Embedded)도 이 방식으로 조회할 수 있다.
+
+
+
+**DTO로 직접 조회**
+
+~~~java
+@Query ("select new package.MemberDto(m.id, m.username, t.name) from Member m join m.team t")
+List<MemberDto> findMemberDto();
+~~~
+
+
+
+**주의! DTO로 직접 조회하려면 JPA의 'new'명령어를 사용해야 한다. 그리고 다음과 같이 생성자가 맞는 DTO가 필요하다.**
+
+
+
+## 파라미터 바인딩
+
+- 위치기반
+- 이름 기반
+
+~~~sql
+select m from Member m where m.username = ?0 //위치 기반
+select m from Member m where m.username = :username//이름 기반
+~~~
+
+
+
+**파라미터 바인딩**
+
+~~~java
+@Query("select m from Member m where m.username = :name")
+Member findMembers(@Param("name") String username);
+~~~
+
+**참고: 코드 가독성과 유지보수를 위해 이름 기반 파라미터를 사용하자!**
+
+
+
+**컬렉션 파라미터 바인딩**
+
+Collection 타입으로 in절 지원
+
+~~~java
+@Query("select m from Member m where m.username in :names")
+List<Member> findByNames(@Param("names") Collection<String> names);
+~~~
+
