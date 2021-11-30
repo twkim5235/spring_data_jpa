@@ -3,6 +3,9 @@ package study.datajpa.repository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 import study.datajpa.dto.MemberDto;
@@ -152,5 +155,47 @@ class MemberRepositoryTest {
 
         Optional<Member>  result = memberRepository.findOptionalByUsername("AAA");
         System.out.println("result = " + result);
+    }
+
+    @Test
+    public void paging() {
+        //given
+        memberRepository.save(new Member("member1", 10));
+        memberRepository.save(new Member("member2", 10));
+        memberRepository.save(new Member("member3", 10));
+        memberRepository.save(new Member("member4", 10));
+        memberRepository.save(new Member("member5", 10));
+
+        int age = 10;
+        PageRequest pageRequest = PageRequest.of(0, 3, Sort.by(Sort.Direction.DESC, "username"));
+
+        //when
+        Page<Member> page = memberRepository.findByAge(age, pageRequest);
+
+        Page<MemberDto> toMap = page.map(m -> new MemberDto(m.getId(), m.getUsername(), null));
+
+        //then
+        List<Member> content = page.getContent();
+
+        assertThat(content.size()).isEqualTo(3); //보여주는 데이터 개수
+        assertThat(page.getTotalElements()).isEqualTo(5); // 총 데이터 개수
+        assertThat(page.getNumber()).isEqualTo(0); //페이지 번호
+        assertThat(page.getTotalPages()).isEqualTo(2); //총 페이지 개수
+        assertThat(page.isFirst()).isTrue(); //첫번째 페이지인지 확인
+        assertThat(page.hasNext()).isTrue(); //다음 페이지가 존재하는지 확인
+
+//        //when
+//        Slice<Member> slice = memberRepository.findSliceByAge(age, pageRequest);
+//
+//        //then
+//        List<Member> sliceContent = slice.getContent();
+//
+//        assertThat(sliceContent.size()).isEqualTo(3); //보여주는 데이터 개수
+////        assertThat(slice.getTotalElements()).isEqualTo(5); // 총 데이터 개수
+//        assertThat(slice.getNumber()).isEqualTo(0); //페이지 번호
+////        assertThat(slice.getTotalPages()).isEqualTo(2); //총 페이지 개수
+//        assertThat(slice.isFirst()).isTrue(); //첫번째 페이지인지 확인
+//        assertThat(slice.hasNext()).isTrue(); //다음 페이지가 존재하는지 확인
+
     }
 }
