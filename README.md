@@ -236,3 +236,157 @@ Collection 타입으로 in절 지원
 List<Member> findByNames(@Param("names") Collection<String> names);
 ~~~
 
+## 반환 타입
+
+JPA에서는 반환타입을 유연하게 설정할 수 있다.
+
+~~~java
+List<Member> findListByUsername(String username); //컬렉션
+Member findMemberByUsername(String username); //단건
+Optional<Member> findOptionalByUsername(String username); //단건 Optional
+~~~
+
+**참고: 왠만하면 단건조회를 할때 Optional로 감싸서 반환하도록 하자, 왜냐하면 조회를 했을 때 데이터가 없다면 그냥 반환할 시 Spring Data JPA가 NullExecption오류를 한번 감싸서 null로 반환해주지만 Optional로 반환하면 한번 감싸주기 때문에 더 안전하다.**
+
+
+
+**조회결과나 많거나 없을 때**
+
+- 컬렉션
+  - 결과 없음: 빈 컬렉션을 반환한다.
+- 단건 조회
+  - 결과 없음: null 반환
+  - 결과가 2건 이상: NonUniqueResultException 예외를 발생한다.
+
+
+
+## 순수 JPA 페이징과 정렬
+
+**페이징 정렬 예시**
+
+- 검색 조건: 나이가 10살
+- 정렬 조건: 이름으로 내림차순
+- 페이징 조건: 첫 번째 페이지, 페이지당 보여줄 데이터는 3건
+
+~~~java
+public List<Member> findByPage(int age, int offset, int limit) {
+        return em.createQuery("select m from Member m where m.age = :age order by m.username desc ")
+                .setParameter("age", age)
+                .setFirstResult(offset)
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
+    public long totalCount(int age) {
+        return em.createQuery("select count(m) from Member m where m.age = :age", Long.class)
+                .setParameter("age", age)
+                .getSingleResult();
+    }
+~~~
+
+
+
+## Spring Data JPA 페이징과 정렬
+
+**페이징과 정렬 파라미터**
+
+- org.springframework.data.domain.Sort: 정렬 기능
+- org.springframework.data.domain.Pageable: 페이징 기능(내부에 Sort 포함)
+
+
+
+**특별한 반환 타입**
+
+- org.springframework.data.domain.Page: 추가 count 쿼리 결과를 포함하는 페이징
+- org.springframework.data.domain.Slice: 추가 count 쿼리 없이 다음 페이지만 확인 가능(내부적으로 limit + 1조회)
+  - ex) 모바일의 더보기 같은 것들
+- List (자바 컬렉션): 추가 count 쿼리 없이 결과만 반환
+
+
+
+**페이징과 정렬 사용 예제**
+
+~~~java
+Page<Member> findByUsername(String name, Pageable pageable);
+//count 쿼리 사용
+Slice<Member> findByUsername(String name, Pageable pageable);
+//count 쿼리 사용 안함
+List<Member> findByUseranme(String name, Pageable pageable);
+//count 쿼리 사용 안함
+List<Member> findByUsername(String name, Sort sort);
+~~~
+
+
+
+**Paging 예제**
+
+~~~java
+Repository:
+Page<Member> findByUsername(String name, Pageable pageable);
+//Paging도 되고, count 쿼리가 알아서 만들어짐
+        
+Test:
+PageRequest pageRequest = PageRequest.of(0, 3, Sort.by(Sort.Direction.DESC, "username"));
+
+Page<Member> page = memberRepository.findByAge(age, pageRequest);
+
+assertThat(content.size()).isEqualTo(3); //보여주는 데이터 개수
+assertThat(page.getTotalElements()).isEqualTo(5); // 총 데이터 개수
+assertThat(page.getNumber()).isEqualTo(0); //페이지 번호
+assertThat(page.getTotalPages()).isEqualTo(2); //총 페이지 개수
+assertThat(page.isFirst()).isTrue(); //첫번째 페이지인지 확인
+assertThat(page.hasNext()).isTrue(); //다음 페이지가 존재하는지 확인
+~~~
+
+**count 쿼리시 성능이 느려진다면 count query를 따로 분리한다.**
+
+~~~java
+@Query(value = "select m from Member m left join m.team",
+       countQuery = "select count (m) from Member m")
+			 // count쿼리 분리
+Page<Member> findByAge(int age, Pageable pageable);
+~~~
+
+#### 실무 팁!!: API로 반환값을 제공할 때는 Entity가 아니라 DTO로 반환해서 제공해야 된다.
+
+~~~java
+Page<MemberDto> toMap = page.map(member -> new MemberDto(member.getId(), member.getUsername(), null));
+~~~
+
+map을 사용해서 DTO로 다시 객체를 생성해서 반환한다.
+
+**참고: Page는 1부터 시작이 아니라 0부터 시작이다.**
+
+
+
+**Slice 예제**
+
+~~~java
+Repository:
+Slice<Member> findSliceByAge(int age, Pageable pageable);
+
+Test:
+PageRequest pageRequest = PageRequest.of(0, 3, Sort.by(Sort.Direction.DESC, "username"));
+
+Slice<Member> slice = memberRepository.findSliceByAge(age, pageRequest);
+
+//then
+List<Member> sliceContent = slice.getContent();
+
+assertThat(sliceContent.size()).isEqualTo(4); //보여주는 데이터 개수
+//        assertThat(slice.getTotalElements()).isEqualTo(5); // 총 데이터 개수
+assertThat(slice.getNumber()).isEqualTo(0); //페이지 번호
+//        assertThat(slice.getTotalPages()).isEqualTo(2); //총 페이지 개수
+assertThat(slice.isFirst()).isTrue(); //첫번째 페이지인지 확인
+assertThat(slice.hasNext()).isTrue(); //다음 페이지가 존재하는지 확인
+
+~~~
+
+
+
+**List 예제**
+
+~~~java
+List<Member> findListByAge(int age, Pageable pageable);
+~~~
+
