@@ -390,3 +390,84 @@ assertThat(slice.hasNext()).isTrue(); //다음 페이지가 존재하는지 확�
 List<Member> findListByAge(int age, Pageable pageable);
 ~~~
 
+## 벌크성 수정 쿼리
+
+**JPA를 사용한 벌크성 수정 쿼리**
+
+~~~java
+public int bulkAgePlus(int age) {
+        return em.createQuery("update Member m set m.age = m.age + 1 where m.age >= :age")
+                .setParameter("age", age)
+                .executeUpdate();
+}
+~~~
+
+executeUpdate()는 응답값의 개수를 반환해준다.
+
+
+
+**Spring Data JPA를 사용한 벌크성 수정 쿼리**
+
+~~~java
+@Modifying
+@Query("update Member m set m.age = m.age + 1 where m.age >= :age")
+int bulkAgePlus(@Param("age") int age);
+~~~
+
+@Modifying이 있어야, JPA의 executeUpdate()를 실행한다. 그리고 Modifying을 통해 변경한다는 것을 정의할 수 있다.
+
+JPQL을 적으면 JPQL메소드가 실행되기전에 먼저 flush를하고 JPQL 메소드가 실행된다.
+
+
+
+**문제점: 벌크성 쿼리를 전송하면 영속성 컨텍스트를 거치고 가는게 아니라 DB로 바로 전송되기 때문에 영속성 컨텍스트의 Data와 DB에 저장되어있는 Data가 상이 할 수 있다. 벌크 연산을 수정하고 logic이 끝나면 상관이 없는데, 만약에 같은 트랜잭션 안에서 다른작업을 하게 되면 문제가 야기된다.**
+
+ex)
+
+~~~ java
+memberRepository.save(new Member("member5", 40));
+
+int resultCount = memberRepository.bulkAgePlus(20); //벌크 연산 실행
+
+
+Optional<Member> member5 = memberRepository.findOptionalByUsername("member5");
+System.out.println("member5.get() = " + member5.get());
+
+실행결과: 
+DB: member5: 41
+Code: member5.get() = Member(id=5, username=member5, age=40)
+~~~
+
+
+
+**해결방법: 벌크성 쿼리를 전송한 뒤에 EntityManager를 초기화 한다.**
+
+방법1: 벌크연산을 한후 영속성 컨텍스트를 초기화 해준다.
+
+~~~java
+@PersistenceContext
+EntityManager em;
+
+memberRepository.save(new Member("member5", 40));
+
+int resultCount = memberRepository.bulkAgePlus(20); //벌크 연산 실행
+em.clear();
+
+Optional<Member> member5 = memberRepository.findOptionalByUsername("member5");
+System.out.println("member5.get() = " + member5.get());
+
+실행결과: 
+DB: member5: 41
+Code: member5.get() = Member(id=5, username=member5, age=41)
+~~~
+
+
+
+방법2: @Modifying() 어노테이션에 clearAuomatically 옵션을 넣어준다.
+
+~~~java
+@Modifying(clearAutomatically = true)
+@Query("update Member m set m.age = m.age + 1 where m.age >= :age")
+int bulkAgePlus(@Param("age") int age);
+~~~
+
