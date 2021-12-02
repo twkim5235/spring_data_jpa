@@ -471,3 +471,72 @@ Code: member5.get() = Member(id=5, username=member5, age=41)
 int bulkAgePlus(@Param("age") int age);
 ~~~
 
+## @EntityGraph
+
+연관된 엔티티들을 SQL 한번에 조회
+
+member -> team은 지연로딩 관계이다. 따라서 다음과 같이 team의 데이터를 조회할 때 마다 쿼리가 실행된다(N+1 문제 발생)
+
+~~~java
+@Test
+    public void findMemberLazy() {
+        //given
+        //member1 -> teamA
+        //member2 -> teamB
+
+        Team teamA = new Team("teamA");
+        Team teamB = new Team("teamB");
+        teamRepository.save(teamA);
+        teamRepository.save(teamB);
+
+        Member member1 = new Member("member1", 10, teamA);
+        Member member2 = new Member("member2", 10, teamB);
+        memberRepository.save(member1);
+        memberRepository.save(member2);
+
+        em.flush();
+        em.clear();
+        
+        //when N + 1문제
+        //select Member 1
+        List<Member> members = memberRepository.findAll();
+
+        for (Member member : members) {
+            System.out.println("member.getUsername() = " + member.getUsername());
+            System.out.println("member.getTeam().getClass() = " + member.getTeam().getClass());
+            System.out.println("member.getTeam().getName() = " + member.getTeam().getName());
+        }
+    }
+~~~
+
+
+
+### N+1 문제
+
+**N+1 문제는 위 처럼 Member를 한번만 조회해서 Data가 N개가 조회됬는데, Member의 Team정보를 확인하려할 때마다 Team 조회 쿼리가 또 N개 만큼 발생되는 문제를 말한다.**
+
+
+
+### 해결 방법
+
+1. Fetch Join 사용
+
+   Fetch Join은 연관관계가 맺어진 모든 Entity 즉 객체 그래프를 모두 다 Join해서 한번에 다 가져온다.
+
+   ~~~java
+   @Query("select m from Member m left join fetch m.team")
+   List<Member> findMemberByFetchJoin();
+   ~~~
+
+
+
+2. EntityGraph 사용
+   
+   EntityGraph도 결국엔 내부적으로는 fetch join을 하는거다.
+   ~~~java
+   @Override
+   @EntityGraph(attributePaths = {"team"})
+   List<Member> findAll();
+   ~~~
+
+   
