@@ -539,4 +539,91 @@ member -> team은 지연로딩 관계이다. 따라서 다음과 같이 team의 
    List<Member> findAll();
    ~~~
 
-   
+## JPA Hint & Lock
+
+### JPA Hint
+
+JPA 쿼리 힌트(SQL 힌트가 아니라 JPA 구현체에게 제공하는 힌트)
+
+**쿼리힌트 사용**
+
+~~~java
+@QueryHints(value = @QueryHint(name = "org.hibernate.readOnly", value = "true"))
+Member findReadOnlyByUsername(String username);
+~~~
+
+
+
+**쿼리 힌트 사용 확인**
+
+~~~java
+@Test
+public void queryHint() {
+        //given
+        Member member1 = new Member("member1", 10);
+        memberRepository.save(member1);
+        em.flush();
+        em.clear();
+
+        //when
+        Member findMember = memberRepository.findReadOnlyByUsername("member1");
+        findMember.setUsername("member2");
+				//변경감지를 할때 메모리에 원본 객체와 변경된 객체 2개를 저장해둔다. 그러므로 약간의 메모리 낭비가 생길 수 있다. 그래서 JPA Hint를 써서 이 코드는 수정을 안하고, 조회만 한다는 Hint를 설정하여, 메모리 낭비를 줄여준다.
+        em.flush();
+}
+~~~
+
+findMember.setUseranme밑에 주석을 달았지만 막상 실무에서 다이나믹하게 성능이 최적화가 되지는 않는다고 한다. 그러므로 성능 Test를 직접해본 뒤 적용을 생각해보자
+
+
+
+### JPA Lock
+
+개념이 어려우니 JPA책 참고 - 딱히 실무에서 쓸일이 많지 않음
+
+**Lock 사용**
+
+~~~java
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+List<Member> findLockByUsername(String username);
+~~~
+
+
+
+
+
+## 확장기능
+
+### 사용자 정의 Repository 구현
+
+- 스프링 데이터 JPA Repository는 인터페이스만 정의하고 구현체는 스프링이 자동 생성
+- 스프링 데이터 JPA가 제공하는 인터페이스를 직접 구현하면 구현해야 하는 기능이 너무 많다.
+- 다양한 이유로 인터페이스의 메소드를 직접 구현하고 싶다면?
+- JPA 직접 사용(EntityManager)
+- 스프링 JDBC Template 사용
+- MyBatis 사용
+- 데이터베이스 커넥션 직접 사용 등
+- Querydsl 사용 (실무에서 제일 많이 쓰는 거 같음)
+
+
+
+**사용자 정의 인터페이스**
+
+~~~java
+public interface MemberRepositoryCustom{
+	List<Member> findMemberCustom();
+}
+~~~
+
+
+
+**사용자 정의 구현 클래스**
+
+- 규칙: 자신이 만든 Repository 인터페이스 이름 + Impl
+- 스프링 데이터 JPA가 인식해서 스프링 빈으로 등록
+
+
+
+**참고: 항상 사용자 정의 Repository가 필요한 것은 아니다. 그냥 임의의 Repository를 만들어도 된다. 예를 들어 MemberQueryRepository를 그냥 인터페이스 가인 클래스로 만들고 스프링 빈으로 등록해서 그냥 직접 사용해도 된다. 물론 이경우 스프링 데이터 JPA와는 아무런 관계없이 별도로 동작한다.**
+
+**실무에서 핵심비즈니스로 관련된 Repository랑 단순 화면용 Repository를 왠만하면 분리해서 사용하자.**
