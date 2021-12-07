@@ -956,3 +956,122 @@ public Page<MemberDto> list(@PageableDefault(size = 5) Pageable pageable) {
     }
 ~~~
 
+## 스프링 데이터 JPA 분석
+
+## 스프링 데이터 JPA 구현체 분석
+
+- 스프링 데이터 JPA가 제공하는 공통 인터페이스의 구현체
+
+@Repository의 적용
+
+- 스프링 컴포넌트 스캔의 대상
+
+- 영속성 계층의 예외들을 스프링에서 쓸 수 있는 예외들로 변경해준다.
+
+@Transactional 트랜잭션 적용
+
+- JPA의 모든 변경은 트랜잭션 안에서 동작한다.
+- 스프링 데이터 JPA는 변경(등록, 수정, 삭제) 메서드를 트랜잭션안에서 처리된다.
+- 서비스 계층에서 트랜잭션을 시작하지 않으면 Repository에서 트랜잭션을 시작한다.
+- 서비스 계층에서 트랜잭션을 시작하면 Repository는 해당 트랜잭션을 전달 받아서 사용한다.
+- 스프링 데이터 JPA를 사용할 때 트랜잭션이 없어도 등록 변경이 가능하다.(왜냐하면 변경시 Repository 메소드 단에서 트랜잭션을 시작하기 때문이다.)
+
+- 참고: @Transactional을 Test에서 사용하면, 테스트를 실행할 때마다 트랜잭션을 시작하고, 트랜잭션이 끝나면 강제로 롤백을 한다.(옵션을 설저하면 롤백을 취소할 수 있다.)
+
+
+
+@Transactional(readOnly = true)
+
+- 데이터를 단순히 조회만 하고 변경하지 않는 트랜잭션에서 readOnly = true 옵션을 사용하면 플러시를 생략해서 약간의 성능 향상을 얻을 수 있다.
+
+
+
+#### 매우 중요!!
+
+save() 메소드
+
+- 새로운 엔티티면 저장 ('persist')
+- 새로운 엔티티가 아니면 병합 ('merge')
+  - 참고: 데이터를 update할 때는 최대한 변경감지로 update 해주고 merge를 사용할 때는 영속상태 entity가 어떠한 이유로 영속상태를 벗어났다가, 다시 영속상태로 만들 때 사용한다.
+
+
+
+## 새로운 엔티티를 구별하는 방법
+
+save() 메소드
+
+- 새로운 엔티티면 저장 ('persist')
+- 새로운 엔티티가 아니면 병합 ('merge')
+
+
+
+새로운 엔티티를 판단하는 기본 전략
+
+- 식별자가 객체일 때 null로 판단
+- 식별자가 자바 기본 타입일 때 '0'으로 판단
+- Persistable 인터페이스를 구현해서 판단 로직 변경 가능
+
+
+
+Persistable
+
+~~~java
+package org.springframework.data.domain;
+
+import org.springframework.lang.Nullable;
+
+public interface Persistable<ID> {
+
+	@Nullable
+	ID getId();
+
+	boolean isNew();
+}
+
+~~~
+
+참고: JPA 식별자 생성 전략이 @GenrateValue면 save()호출 시점에 식별자가 없으므로 새로운 엔티티로 인식해서 정상 동작한다. <br>그래서 JPA 식별자 생성 전략이 @Id만 사용해서 직접할당이면 이미 식별자 값이 있는 상태로 save()를 호출한다. <br>따라서 이경우 merge()가 호출된다. merge()는 우선 DB를 호출해서 값을 확인하고, DB에 값이 없으면 새로운 엔티티로 인지하므로 매우 비효율 적이다. <br>따라서 Persistable을 사용해서 새로운 엔티티 확인 여부를 직접 구현하는게 효과적이다. 참고로 등록시간을 조합해서 사용하면 이 필드로 새로운 엔티티 여부를 편리하게 확인할 수 있다.(@CreatedDate에 값이 없으면 새로운 엔티티로 판단)
+
+Persistable 구현
+
+~~~java
+package study.datajpa.entity;
+
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.domain.Persistable;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import javax.persistence.Entity;
+import javax.persistence.EntityListeners;
+import javax.persistence.Id;
+import java.time.LocalDateTime;
+
+@Entity
+@EntityListeners(AuditingEntityListener.class)
+public class Item implements Persistable<String> {
+
+    @Id
+    private String id;
+
+    @CreatedDate
+    private LocalDateTime createdDate;
+
+    public Item() {
+    }
+
+    public Item(String id) {
+        this.id = id;
+    }
+
+    @Override
+    public String getId() {
+        return id;
+    }
+
+    @Override
+    public boolean isNew() {
+        return createdDate == null;
+    }
+}
+~~~
+
