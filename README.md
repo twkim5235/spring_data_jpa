@@ -94,7 +94,7 @@ JpaRepository는 대부분의 공통메서드를 제공한다.
 
 - 메소드 이름으로 쿼리 생성
 - 메소드 이름으로 JPA NamedQuery 호출
-- @Query 어노테이션을 사용해서 Repository 인터페이스에 쿠러 직접 정의
+- @Query 어노테이션을 사용해서 Repository 인터페이스에 쿼리 직접 정의
 
 
 
